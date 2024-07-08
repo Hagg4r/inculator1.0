@@ -25,6 +25,10 @@ install_tools() {
     declare -A tools=(
         ["curl"]="curl"
         ["sqlmap"]="sqlmap"
+        ["nmap"]="nmap"
+        ["uniscan"]="uniscan"
+        ["whois"]="whois"
+        ["subfinder"]="subfinder"
     )
     
     for tool in "${!tools[@]}"; do
@@ -178,9 +182,37 @@ perform_ftp_scan() {
     ((file_count++))
 }
 
-# Placeholder function to access seclists database
-access_seclists() {
-    echo "Seclists database accessed successfully."
+# Function to perform a Uniscan scan
+perform_uniscan_scan() {
+    local target_url="$1"
+    local results_dir="$2"
+    local result
+    result=$(run_command uniscan -u "$target_url" -qweds)
+    local output_file="$results_dir/uniscan_results.txt"
+    save_to_file "$output_file" "$result"
+    echo "Saved Uniscan results to $output_file"
+}
+
+# Function to perform a Whois lookup
+perform_whois_lookup() {
+    local target_url="$1"
+    local results_dir="$2"
+    local result
+    result=$(run_command whois "$target_url")
+    local output_file="$results_dir/whois_results.txt"
+    save_to_file "$output_file" "$result"
+    echo "Saved Whois lookup results to $output_file"
+}
+
+# Function to perform a Subfinder scan
+perform_subfinder_scan() {
+    local target_url="$1"
+    local results_dir="$2"
+    local result
+    result=$(run_command subfinder -d "$target_url")
+    local output_file="$results_dir/subfinder_results.txt"
+    save_to_file "$output_file" "$result"
+    echo "Saved Subfinder results to $output_file"
 }
 
 # Main function to orchestrate the security scans
@@ -195,7 +227,7 @@ main() {
     clear_screen
     
     # Get the target URL from the user
-    read -p "Enter the target URL: " target_url
+        read -p "Enter the target URL: " target_url
     
     # Create a results directory
     local results_dir="./results"
@@ -203,7 +235,7 @@ main() {
     
     # Check if the website is accessible
     if check_website_status "$target_url"; then
-        echo "Starting SQL Injection attempts..."
+        echo "Starting SQL Injection attempts ✅..."
         perform_sql_injection "$target_url" "$results_dir"
         
         echo "Starting SQLmap scan..."
@@ -212,10 +244,18 @@ main() {
         echo "Starting FTP scan..."
         perform_ftp_scan "$target_url" "$results_dir"
         
-        echo "Accessing Seclists database..."
-        access_seclists
+        echo "Starting Uniscan scan..."
+        perform_uniscan_scan "$target_url" "$results_dir"
+        
+        echo "Starting Whois lookup..."
+        perform_whois_lookup "$target_url" "$results_dir"
+        
+        echo "Starting Subfinder scan..."
+        perform_subfinder_scan "$target_url" "$results_dir"
+        
+        echo "All scans completed. Results are saved in the $results_dir directory."
     else
-        echo "The website is not accessible. Exiting..."
+        echo "The website is not accessible. Exiting ❌..."
     fi
 }
 
