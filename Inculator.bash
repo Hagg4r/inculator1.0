@@ -216,7 +216,7 @@ perform_subfinder_scan() {
 echo “Saved Subfinder scan results to $output_file”
 }
 
-Function to perform an XSS attack
+#Function to perform an XSS attack
 
 perform_xss_attack() {
 local target_url=”$1”
@@ -228,7 +228,7 @@ save_to_file “$output_file” “$result”
 echo “Saved XSS attack results to $output_file”
 }
 
-Function to perform a DDoS attack
+#Function to perform a DDoS attack
 
 perform_ddos_attack() {
 local target_url=”$1”
@@ -241,7 +241,7 @@ save_to_file “$output_file” “$result”
 echo “Saved DDoS attack results to $output_file”
 }
 
-Function to access the database and download it
+#Function to access the database and download it
 
 access_database() {
 local target_url=”$1”
@@ -253,7 +253,7 @@ save_to_file “$output_file” “$result”
 echo “Saved database dump to $output_file”
 }
 
-Function to perform an SQL injection using sqlninja
+#Function to perform an SQL injection using sqlninja
 
 perform_sqlninja_attack() {
 local target_url=”$1”
@@ -265,7 +265,7 @@ save_to_file “$output_file” “$result”
 echo “Saved sqlninja attack results to output_file”
 }
 
-Main function to orchestrate the security scans
+#Main function to orchestrate the security scans
 
 main() {
 # Install necessary tools
